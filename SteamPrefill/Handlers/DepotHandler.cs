@@ -140,6 +140,9 @@
             var chunkQueue = new List<QueuedRequest>();
             foreach (var depotManifest in depotManifests)
             {
+                var depot = depots.First(e => e.DepotId == depotManifest.DepotId);
+                var depotKey = await _steam3Session.RequestDepotKey(depotManifest.DepotId, depot.ContainingAppId);
+
                 // A depot will contain multiple files, that are broken up into 1MB chunks
                 var dedupedChunks = depotManifest.Files
                                                  .SelectMany(e => e.Chunks)
@@ -149,7 +152,7 @@
 
                 foreach (ChunkData chunk in dedupedChunks)
                 {
-                    chunkQueue.Add(new QueuedRequest(depotManifest, chunk));
+                    chunkQueue.Add(new QueuedRequest(depotManifest, chunk, depotKey));
                 }
             }
             return chunkQueue;

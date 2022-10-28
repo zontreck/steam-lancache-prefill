@@ -107,7 +107,7 @@ namespace SteamPrefill.Handlers.Steam
                     ctx.Status = "Retrieving access token...";
                     await GetAccessTokenAsync();
 
-                    ctx.Status = "Logging in to Steam...";
+                    ctx.Status = "Logging into Steam...";
                     logonResult = AttemptSteamLogin();
                 });
 
@@ -124,7 +124,7 @@ namespace SteamPrefill.Handlers.Steam
         }
 
         private async Task GetAccessTokenAsync()
-        {
+            {
             if (_userAccountStore.AccessTokenIsValid())
             {
                 return;
@@ -345,6 +345,15 @@ namespace SteamPrefill.Handlers.Steam
         }
 
         #endregion
+
+        public async Task<byte[]> RequestDepotKey(uint depotId, uint appid = 0)
+        {
+            var completed = false;
+
+            var response = await SteamAppsApi.GetDepotDecryptionKey(depotId, appid).ToTask();
+
+            return response.DepotKey;
+        }
 
         public void Dispose()
         {
