@@ -1,4 +1,7 @@
-﻿namespace SteamPrefill.Handlers
+﻿using SteamPrefill.Handlers.Steam;
+using System.Net.Http;
+
+namespace SteamPrefill.Handlers
 {
     /// <summary>
     /// Responsible for downloading manifests from Steam, as well as loading previously saved manifests from disk.
@@ -13,6 +16,13 @@
         private readonly CdnPool _cdnPool;
         private readonly Steam3Session _steam3Session;
         private readonly DownloadArguments _downloadArguments;
+        private readonly HttpClient _httpClient;
+
+        /// <summary>
+        /// The URL/IP Address where the Lancache has been detected.
+        /// </summary>
+        //TODO resolve this 
+        private string _lancacheAddress = "192.168.1.223";
 
         private const int MaxRetries = 3;
 
@@ -22,6 +32,11 @@
             _cdnPool = cdnPool;
             _steam3Session = steam3Session;
             _downloadArguments = downloadArguments;
+            _httpClient = new HttpClient
+            {
+                Timeout = AppConfig.SteamKitRequestTimeout
+            };
+            _httpClient.DefaultRequestHeaders.Add("User-Agent", "Valve/Steam HTTP Client 1.0");
         }
 
         /// <summary>
@@ -107,9 +122,17 @@
             _ansiConsole.LogMarkupVerbose($"Downloading manifest {LightYellow(depot.ManifestId)} for depot {Cyan(depot.DepotId)}");
 
             ManifestRequestCode manifestRequestCode = await GetManifestRequestCodeAsync(depot);
-
             Server server = _cdnPool.TakeConnection();
-            DepotManifest manifest = await _steam3Session.CdnClient.DownloadManifestAsync(depot.DepotId, depot.ManifestId.Value, manifestRequestCode.Code, server);
+
+            var url = $"depot/{depot.DepotId}/manifest/{depot.ManifestId.Value}/5/{manifestRequestCode.Code}";
+            var fullUrl = $"http://{server.Host}/{url}";
+            _ansiConsole.LogMarkupLine($"Downloading manifest from url {MediumPurple(fullUrl)}");
+
+            var timer = Stopwatch.StartNew();
+            DepotManifest manifest = await DownloadManifest2(depot, manifestRequestCode, server);
+            _ansiConsole.LogMarkupLine("Manifest downloaded", timer);
+
+            //DepotManifest manifest = await _steam3Session.CdnClient.DownloadManifestAsync(depot.DepotId, depot.ManifestId.Value, manifestRequestCode.Code, server);
             if (manifest == null)
             {
                 throw new ManifestException($"Unable to download manifest for depot {depot.Name} - {depot.DepotId}.  Manifest request received no response.");
@@ -125,6 +148,29 @@
             protoManifest.SaveToFile(depot.ManifestFileName);
             return protoManifest;
         }
+
+        public async Task<DepotManifest> DownloadManifest2(DepotInfo depot, ManifestRequestCode manifestRequestCode, Server server)
+        {
+            var url = $"http://{_lancacheAddress}/depot/{depot.DepotId}/manifest/{depot.ManifestId}/{(uint)5}/{manifestRequestCode}";
+
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Get, url);
+            requestMessage.Headers.Host = server.Host;
+
+            using var response = await _httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead);
+            var manifestData = await response.Content.ReadAsByteArrayAsync();
+
+            manifestData = ZipUtil.Decompress(manifestData);
+            var depotManifest = new DepotManifest(manifestData);
+
+            //if (depotKey != null)
+            //{
+            //    // if we have the depot key, decrypt the manifest filenames
+            //    depotManifest.DecryptFilenames(depotKey);
+            //}
+
+            return depotManifest;
+        }
+
 
         /// <summary>
         /// Requests a ManifestRequestCode for the specified depot.  Each depot will have a unique code, that gets rotated every 5 minutes.
