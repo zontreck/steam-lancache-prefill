@@ -1,7 +1,4 @@
-﻿using SteamPrefill.Handlers.Steam;
-using System.Net.Http;
-
-namespace SteamPrefill.Handlers
+﻿namespace SteamPrefill.Handlers
 {
     /// <summary>
     /// Responsible for downloading manifests from Steam, as well as loading previously saved manifests from disk.
@@ -10,7 +7,9 @@ namespace SteamPrefill.Handlers
     /// A manifest typically represents a single "version" of a depot, so subsequent updates to the depot will have
     /// a different manifest.
     /// </summary>
+#pragma warning disable CA1001
     public sealed class ManifestHandler
+#pragma warning restore CA1001
     {
         private readonly IAnsiConsole _ansiConsole;
         private readonly CdnPool _cdnPool;
@@ -149,7 +148,9 @@ namespace SteamPrefill.Handlers
             return protoManifest;
         }
 
+#pragma warning disable VSTHRD200
         public async Task<DepotManifest> DownloadManifest2(DepotInfo depot, ManifestRequestCode manifestRequestCode, Server server)
+#pragma warning restore VSTHRD200
         {
             var url = $"http://{_lancacheAddress}/depot/{depot.DepotId}/manifest/{depot.ManifestId}/{(uint)5}/{manifestRequestCode}";
 
